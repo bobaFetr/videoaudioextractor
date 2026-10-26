@@ -1,4 +1,5 @@
 import io
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import subprocess
 import tempfile
@@ -116,6 +117,67 @@ class ExtractionTests(unittest.TestCase):
         with patch.dict(converter.app.config, MAX_CONTENT_LENGTH=100):
             response = self.upload(b"x" * 200)
         self.assertEqual(response.status_code, 413)
+        self.assertIn("error", response.json)
+        self.assert_clean()
+
+    def test_concurrent_uploads_keep_results_separate(self):
+        video = self.make_video()
+
+        def convert(filename):
+            with converter.app.test_client() as client:
+                response = client.post("/extract", data={"video": (io.BytesIO(video), filename)}, buffered=True)
+                try:
+                    return response.status_code, response.headers.get("Content-Disposition"), response.data
+                finally:
+                    response.close()
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(convert, ["first.mkv", "second.mkv"]))
+        for name, (status, disposition, data) in zip(["first", "second"], results):
+            self.assertEqual(status, 200, data)
+            self.assertIn(f'{name}.mp3', disposition)
+            subprocess.run([self.ffmpeg, "-v", "error", "-i", "pipe:0", "-f", "null", "-"], input=data, check=True)
+        self.assert_clean()
+
+    def test_unicode_temporary_path(self):
+        video = self.make_video()
+        directory = Path(self.folder.name) / "временни файлове"
+        directory.mkdir()
+        with patch.object(tempfile, "tempdir", str(directory)):
+            response = self.upload(video)
+        self.assertEqual(response.status_code, 200, response.data)
+        response.close()
+        self.assertEqual(list(directory.iterdir()), [])
+
+    def test_homepage_renders_from_another_working_directory(self):
+        # Flask should resolve templates relative to app.py, not the terminal's folder.
+        import os
+        previous = Path.cwd()
+        try:
+            os.chdir(self.folder.name)
+            response = self.client.get("/")
+        finally:
+            os.chdir(previous)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'lang="en"', response.data)
+        self.assertIn(b'id="video"', response.data)
+
+    def test_empty_conversion_output_is_rejected_and_cleaned(self):
+        def empty_conversion(command, **kwargs):
+            Path(command[-1]).touch()
+            return subprocess.CompletedProcess(command, 0)
+
+        with patch.object(converter.subprocess, "run", side_effect=empty_conversion):
+            response = self.upload(b"video")
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("error", response.json)
+        self.assert_clean()
+
+    def test_failed_file_save_returns_json_and_cleans_files(self):
+        with patch("werkzeug.datastructures.FileStorage.save", side_effect=OSError("Disk full")):
+            with self.assertLogs(converter.app.logger, level="ERROR"):
+                response = self.upload(b"video")
+        self.assertEqual(response.status_code, 500)
         self.assertIn("error", response.json)
         self.assert_clean()
 
