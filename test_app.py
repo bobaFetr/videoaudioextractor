@@ -91,6 +91,34 @@ class ExtractionTests(unittest.TestCase):
         response.close()
         self.assert_clean()
 
+    def test_common_video_formats_and_sample_rates(self):
+        formats = [
+            ("mp4", "mpeg4", "aac", "96000"),
+            ("mov", "mpeg4", "pcm_s16le", "44100"),
+            ("avi", "mpeg4", "pcm_s16le", "22050"),
+            ("webm", "libvpx", "libopus", "48000"),
+        ]
+        for extension, video_codec, audio_codec, sample_rate in formats:
+            with self.subTest(format=extension):
+                path = Path(self.folder.name) / f"sample.{extension}"
+                subprocess.run([
+                    self.ffmpeg, "-v", "error", "-y", "-f", "lavfi", "-i", "color=s=64x64:d=0.2",
+                    "-f", "lavfi", "-i", f"sine=frequency=440:sample_rate={sample_rate}:duration=0.2",
+                    "-c:v", video_codec, "-c:a", audio_codec, "-shortest", str(path),
+                ], check=True)
+                response = self.upload(path.read_bytes(), f"клип.{extension}")
+                self.assertEqual(response.status_code, 200, response.data)
+                subprocess.run([self.ffmpeg, "-v", "error", "-i", "pipe:0", "-f", "null", "-"], input=response.data, check=True)
+                response.close()
+                self.assert_clean()
+
+    def test_request_size_limit_returns_json(self):
+        with patch.dict(converter.app.config, MAX_CONTENT_LENGTH=100):
+            response = self.upload(b"x" * 200)
+        self.assertEqual(response.status_code, 413)
+        self.assertIn("error", response.json)
+        self.assert_clean()
+
 
 if __name__ == "__main__":
     unittest.main()
