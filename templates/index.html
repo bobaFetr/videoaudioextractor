@@ -6,42 +6,91 @@
   <title>Video to MP3</title>
   <style>
     * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; font-family: system-ui, sans-serif; color: #e9edf7; background: #0e1423; }
-    main { width: min(100%, 560px); padding: 40px; background: #192238; border: 1px solid #303d57; border-radius: 24px; box-shadow: 0 24px 80px #0004; }
-    .badge { color: #a6b8ff; font-size: 12px; letter-spacing: .15em; font-weight: 700; }
-    h1 { font-size: clamp(28px, 6vw, 38px); margin: 14px 0; letter-spacing: -.04em; }
-    p { color: #adb9d0; line-height: 1.6; }
-    label { display: block; margin-top: 28px; margin-bottom: 10px; font-weight: 600; }
-    input { width: 100%; padding: 18px; border: 1px dashed #6678a0; border-radius: 12px; color: #c9d4eb; }
-    input::file-selector-button { border: 0; padding: 10px; margin-right: 12px; border-radius: 6px; cursor: pointer; }
-    button, .download { display: block; width: 100%; padding: 15px; margin-top: 20px; border: 0; border-radius: 10px; background: #9dabff; color: #111b3a; font: inherit; font-weight: 700; cursor: pointer; text-align: center; text-decoration: none; }
+    :root { color-scheme: light; }
+    body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: #252722; background: #f5f4ef; line-height: 1.5; }
+    .page { width: min(100% - 64px, 1000px); margin: 0 auto; }
+    .masthead { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 26px 0; border-bottom: 1px solid #cccfc4; }
+    .wordmark { font-size: 16px; font-weight: 700; letter-spacing: -.03em; }
+    .masthead span:last-child { color: #61665b; font-size: 12px; font-family: monospace; }
+    main { padding: 76px 0 64px; }
+    .intro { display: grid; grid-template-columns: 1.3fr 1fr; align-items: end; gap: 48px; margin-bottom: 56px; }
+    h1 { font-size: clamp(42px, 7vw, 72px); line-height: 1; font-weight: 400; letter-spacing: -.065em; margin: 0; }
+    p { color: #61665b; margin: 0; }
+    .intro p { max-width: 330px; padding-bottom: 4px; }
+    .workspace { display: grid; grid-template-columns: 1.3fr 1fr; border-top: 2px solid #252722; border-bottom: 1px solid #cccfc4; }
+    .converter { min-width: 0; padding: 30px 40px 36px 0; }
+    label { display: block; margin-bottom: 16px; font-size: 14px; font-weight: 700; }
+    input { display: block; width: 100%; min-width: 0; padding: 16px; border: 1px solid #bfc3b6; border-radius: 3px; background: #fafaf7; font: inherit; font-size: 13px; }
+    input::file-selector-button { border: 1px solid #bfc3b6; background: #eeefe7; color: #252722; padding: 8px 12px; margin-right: 12px; border-radius: 2px; cursor: pointer; font: inherit; }
+    button, .download { display: inline-flex; justify-content: center; padding: 12px 24px; margin-top: 26px; border: 1px solid #252722; border-radius: 3px; background: #252722; color: #fff; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; }
+    button:hover, .download:hover { background: #41473b; }
     button:disabled { opacity: .5; cursor: wait; }
-    :focus-visible { outline: 3px solid #d5ddff; outline-offset: 4px; }
-    small { display: block; color: #8f9db8; margin-top: 12px; }
-    #status { margin-bottom: 0; }
-    .error { color: #ffb5b5; }
-    audio { width: 100%; margin-top: 20px; }
+    :focus-visible { outline: 2px solid #a94b20; outline-offset: 4px; }
+    small { display: block; color: #61665b; margin-top: 10px; font-size: 12px; }
+    #status { font-size: 14px; margin-top: 18px; }
+    #status:empty { display: none; }
+    #status.error { color: #a32c20; }
+    #result { border-top: 1px solid #cccfc4; margin-top: 28px; padding-top: 22px; }
+    #result h2 { font-size: 14px; margin: 0 0 14px; }
+    audio { display: block; width: 100%; }
+    .notes { border-left: 1px solid #cccfc4; padding: 30px 0 36px 32px; }
+    .notes h2 { font-size: 12px; font-weight: 400; color: #61665b; margin: 0 0 22px; font-family: monospace; text-transform: uppercase; letter-spacing: .08em; }
+    dl { margin: 0; font-size: 13px; }
+    dl div { display: flex; justify-content: space-between; gap: 20px; padding: 10px 0; border-bottom: 1px solid #dedfd7; }
+    dt { color: #61665b; }
+    dd { margin: 0; text-align: right; }
+    .notes p { font-size: 12px; margin-top: 24px; max-width: 280px; }
+    footer { padding: 20px 0 36px; color: #61665b; font-size: 12px; }
     [hidden] { display: none !important; }
-    @media (max-width: 480px) { main { padding: 26px; } }
+    @media (max-width: 680px) {
+      .page { width: calc(100% - 40px); }
+      main { padding: 48px 0 32px; }
+      .intro { grid-template-columns: 1fr; gap: 24px; margin-bottom: 36px; }
+      .workspace { grid-template-columns: 1fr; }
+      .converter { padding-right: 0; }
+      .notes { border-left: 0; border-top: 1px solid #cccfc4; padding: 24px 0; }
+    }
   </style>
 </head>
 <body>
+  <div class="page">
+  <header class="masthead">
+    <span class="wordmark">Audio Extractor</span>
+    <span>VIDEO / MP3</span>
+  </header>
   <main>
-    <span class="badge">VIDEO → AUDIO</span>
-    <h1>Your video. Just the audio.</h1>
-    <p>Upload a video and turn its audio track into an MP3, ready to preview and download.</p>
+    <div class="intro">
+      <h1>Video to MP3.</h1>
+      <p>Choose a video to extract its audio. Listen to the result, then save the MP3.</p>
+    </div>
+    <div class="workspace">
+    <div class="converter">
     <form id="form">
       <label for="video">Choose a video</label>
-      <input id="video" name="video" type="file" accept="video/*,.mkv,.avi,.mov,.webm" required>
-      <small>Maximum upload: 500 MB. The video must contain audio.</small>
+      <input id="video" name="video" type="file" accept="video/*,.mkv,.avi,.mov,.webm" aria-describedby="file-help" required>
+      <small id="file-help">MP4, MOV, MKV, AVI, WebM and other video formats.</small>
       <button id="convert" type="submit">Extract MP3</button>
     </form>
     <p id="status" role="status" aria-live="polite"></p>
     <section id="result" aria-label="Extracted audio" hidden>
+      <h2>Extracted audio</h2>
       <audio id="preview" controls></audio>
       <a id="download" class="download">Download MP3</a>
     </section>
+    </div>
+    <aside class="notes" aria-label="Conversion details">
+      <h2>Conversion details</h2>
+      <dl>
+        <div><dt>Output</dt><dd>MP3 audio</dd></div>
+        <div><dt>Upload limit</dt><dd>500 MB</dd></div>
+        <div><dt>Audio track</dt><dd>First track · Stereo</dd></div>
+      </dl>
+      <p>Your video must contain an audio track. Longer videos take more time to process.</p>
+    </aside>
+    </div>
   </main>
+  <footer>Temporary files are removed after processing and transfer.</footer>
+  </div>
   <script>
     const form = document.querySelector('#form');
     const video = document.querySelector('#video');
